@@ -99,10 +99,10 @@ def gen_mp4_file(file_name,text_path):
         raise ValueError(f"{mp4_file_name},转换失败")             
 
 @click.command()
-@click.option('-u', '--input_url', type=str, help='fetch url')
-def main(input_url):
+@click.option('-u', '--url', type=str, help='fetch url')
+def main(url):
     click.echo(f'fetch url:{url}')
-    prefix_url = os.path.dirname(input_url)
+    prefix_url = os.path.dirname(url)
     file_name = prefix_url.split("/")[-1]
     m3u8_file_name = f'{file_name}.m3u8'
     m3u8_file_path = os.path.join(m3u8_path, m3u8_file_name)
@@ -116,6 +116,5 @@ def main(input_url):
     logger.info("生成mp4")    
     gen_mp4_file(file_name,merge_text_path)  
     
-# if __name__ == '__main__':
-#     url = "https://cdn.aliyun.xxx.com/videos/202010/15/5f8345c15cb7bd239883ef72/134aag/index.m3u8"
-#     main(url)
+if __name__ == '__main__':
+     main()
