@@ -9,6 +9,7 @@ import requests
 import os
 from loguru import logger
 import subprocess
+import click
 
 _temp = os.path.dirname(os.path.abspath(__file__))
 m3u8_path = os.path.join(_temp, "m3u8")
