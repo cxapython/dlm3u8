@@ -9,6 +9,7 @@ import requests
 import os
 from loguru import logger
 import subprocess
+
 _temp = os.path.dirname(os.path.abspath(__file__))
 m3u8_path = os.path.join(_temp, "m3u8")
 ts_path = os.path.join(_temp, "ts_file")
@@ -96,7 +97,10 @@ def gen_mp4_file(file_name,text_path):
     except subprocess.CalledProcessError:
         raise ValueError(f"{mp4_file_name},转换失败")             
 
+@click.command()
+@click.option('-u', '--input_url', type=str, help='fetch url')
 def main(input_url):
+    click.echo(f'fetch url:{url}')
     prefix_url = os.path.dirname(input_url)
     file_name = prefix_url.split("/")[-1]
     m3u8_file_name = f'{file_name}.m3u8'
@@ -110,6 +114,7 @@ def main(input_url):
     merge_text_path=merge_ts_file(file_name) 
     logger.info("生成mp4")    
     gen_mp4_file(file_name,merge_text_path)  
-if __name__ == '__main__':
-    url = "https://cdn.aliyun.xxx.com/videos/202010/15/5f8345c15cb7bd239883ef72/134aag/index.m3u8"
-    main(url)
+    
+# if __name__ == '__main__':
+#     url = "https://cdn.aliyun.xxx.com/videos/202010/15/5f8345c15cb7bd239883ef72/134aag/index.m3u8"
+#     main(url)
