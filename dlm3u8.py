@@ -154,8 +154,8 @@ def gen_mp4_file(file_name, text_path):
 
 
 def get_seed(video_id):
-    referer = f"https://jj.009xf.com/YaZhoux/{video_id}.html"
-    url_list = [f"https://jj.009xf.com/play/{video_id}/{index}/1.html" for index in range(1, 4)]
+    referer=""
+    url_list = []
     for url in url_list:
         headers = {
             "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/86.0.4240.111 Safari/537.36",
