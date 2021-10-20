@@ -15,6 +15,9 @@ brew install ffmpeg
 python3.6 dlm3u8.py -n "xxx_class8" -p "https://video.xxx.com" -t 1 -l 1
 ```
 -n:表示文件名
+
 -p:是m3u8里面ts文件补全用的前缀
+
 -t:是下载线程数默认2
+
 -l:表示加载本地m3u8文件
