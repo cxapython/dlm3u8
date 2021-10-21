@@ -8,7 +8,6 @@ import os
 import re
 import subprocess
 from concurrent.futures.thread import ThreadPoolExecutor
-
 import click
 import requests
 from Crypto.Cipher import AES
@@ -30,9 +29,20 @@ if not os.path.exists(mp4_path):
 session = requests.Session()
 
 headers = {
-    "referer": "https://www.kanxue.com/",
     "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/86.0.4240.111 Safari/537.36",
 }
+index_url_map = {
+
+}
+aes_key_str = ""
+aes_iv_str = "0" * 16
+max_ts_index = 0
+
+
+# proxies = {
+#     "http": "http://127.0.0.1:7890",
+#     "https": "https://127.0.0.1:7890"
+# }
 
 
 @retry(stop_max_attempt_number=10, stop_max_delay=1000)
@@ -57,6 +67,7 @@ def download_and_check(url, dst, file_name, my_code=None):
 
 @retry(stop_max_attempt_number=5, stop_max_delay=1000)
 def download_m3u8(url, dst, first_byte, file_size, file_name, aes_key="", aes_iv="0" * 16):
+    logger.info(f"当前下载的是:{url}")
     header = {"Range": f"bytes={first_byte}-{file_size}"}
     pbar = tqdm(
         total=file_size, initial=first_byte,
@@ -86,8 +97,27 @@ def download_from_url(url, dst, file_name, aes_key="", aes_iv="", my_code=None):
     first_byte, file_size, flag = download_and_check(url, dst, file_name, my_code)
     if not flag:
         return
-    logger.info(f"当前下载的是:{url}")
     download_m3u8(url, dst, first_byte, file_size, file_name, aes_key, aes_iv)
+
+
+def before_merge_mp4_check(file_name):
+    need_download_set = set()
+    while not need_download_set:
+        path_join = os.path.join
+        file_list = sorted(int(item.replace(".ts", ""))
+                           for item in os.listdir(ts_path) if ".ts" in item)
+        zero_size_file_set = set()
+        for ts_index in file_list:
+            ts_file_path = path_join(ts_path, f"{ts_index}.ts")
+            if os.path.getsize(ts_file_path) == 0:
+                zero_size_file_set.add(ts_index)
+
+        need_download_set = set(range(1, max_ts_index)) - set(file_list)
+        need_download_set |= need_download_set
+        for ts_index in need_download_set:
+            url = index_url_map[ts_index]
+            full_path = path_join(ts_path, f"{ts_index}.ts")
+            download_from_url(url, full_path, file_name, aes_key=aes_key_str, aes_iv=aes_iv_str)
 
 
 def get_ts_file(ts_item):
@@ -104,7 +134,8 @@ def decrypt(key_str, content, iv_str="0" * 16):
     AES解密
     :return:
     """
-    aes_key = bytes(key_str, encoding='utf-8')
+    if isinstance(key_str, bytes):
+        aes_key = key_str
     aes_iv = bytes(iv_str, encoding='utf-8')
     cipher = AES.new(aes_key, AES.MODE_CBC, aes_iv)
     decrypt_bytes = cipher.decrypt(content)
@@ -114,29 +145,39 @@ def decrypt(key_str, content, iv_str="0" * 16):
 def read_file(prefix_url, file_path):
     with open(file_path, "r") as fs:
         index = 0
-        aes_key_str = ""
-        iv_str = "0" * 16
+        global aes_key_str
+        global aes_iv_str
+
+        global max_ts_index
         for line in fs.readlines():
             new_item = line.strip().replace("\n", "")
             if new_item.startswith("#EXT-X-KEY") and "METHOD=AES-128" in new_item:
                 # 目前只有aes128的解密
                 if not aes_key_str:
                     key_url = re.findall('URI="(.*?)"', new_item)[0]
+                    if prefix_url:
+                        key_url = prefix_url + "/" + key_url
                     cookies = {
 
                     }
                     req = requests.get(key_url, headers=headers, cookies=cookies)
                     if req.status_code in [200, 201]:
-                        aes_key_str = req.text
+                        if ".ts" in key_url:
+                            aes_key_str = req.content
+                        else:
+                            aes_key_str = req.text
                         print(f"获取密钥:{aes_key_str}")
 
                 iv_str_arr = re.findall('IV=(.*)', new_item)
-                iv_str = iv_str_arr[0] if iv_str_arr else iv_str
+                aes_iv_str = iv_str_arr[0] if iv_str_arr else aes_iv_str
             if new_item.endswith(".ts"):
                 if "/" in new_item:
                     new_item = new_item.split("/")[-1]
                 index += 1
-                yield f"{prefix_url}/{new_item}", f"{index}.ts", aes_key_str, iv_str.replace("0x", "")[:16]
+                url = f"{prefix_url}/{new_item}"
+                index_url_map[index] = url
+                max_ts_index = index
+                yield url, f"{index}.ts", aes_key_str, aes_iv_str.replace("0x", "")[:16]
 
 
 def get_m3u8(download_url, file_path):
@@ -214,7 +255,6 @@ def get_seed(video_id):
 @click.option('-p', '--prefix_url', type=str, default="", help='prefix url')
 @click.option('-t', '--threads', type=int, default=2, help='max threads nums')
 def main(video_id, input_url, name, local, prefix_url, threads):
-    m3u8_file_path = m3u8_file_name = file_name = name
     if not name.endswith("m3u8"):
         m3u8_file_path = f"{name}.m3u8"
         m3u8_file_name = name
@@ -230,12 +270,20 @@ def main(video_id, input_url, name, local, prefix_url, threads):
         logger.info(f"file_name:{m3u8_file_name},url:{url}")
         get_m3u8(url, m3u8_file_path)
     ts_item_gen = read_file(prefix_url, m3u8_file_path)
+    i = 1
     if threads == 1:
         for item in ts_item_gen:
+            if i > 5:
+                break
             get_ts_file(item)
+            i += 1
+
     else:
         with ThreadPoolExecutor(threads) as excutor:
             excutor.map(get_ts_file, ts_item_gen)
+    logger.info("检查ts文件是否下载完整")
+    before_merge_mp4_check(file_name)
+
     logger.info("全部下载完成")
     logger.info("生成ts文件列表")
     merge_text_path = merge_ts_file(m3u8_file_name)
