@@ -8,6 +8,7 @@ import os
 import re
 import subprocess
 from concurrent.futures.thread import ThreadPoolExecutor
+from urllib.parse import urljoin
 import click
 import requests
 from Crypto.Cipher import AES
@@ -37,6 +38,7 @@ index_url_map = {
 aes_key_str = ""
 aes_iv_str = "0" * 16
 max_ts_index = 0
+
 
 @retry(stop_max_attempt_number=10, stop_max_delay=1000)
 def download_and_check(url, dst, file_name, my_code=None):
@@ -96,6 +98,8 @@ def download_from_url(url, dst, file_name, aes_key="", aes_iv="", my_code=None):
 def before_merge_mp4_check(file_name):
     need_download_set = set()
     while not need_download_set:
+        import pdb
+        pdb.set_trace()
         path_join = os.path.join
         file_list = sorted(int(item.replace(".ts", ""))
                            for item in os.listdir(ts_path) if ".ts" in item)
@@ -106,10 +110,11 @@ def before_merge_mp4_check(file_name):
                 zero_size_file_set.add(ts_index)
 
         need_download_set = set(range(1, max_ts_index)) - set(file_list)
-        need_download_set |= need_download_set
+        need_download_set |= zero_size_file_set
         for ts_index in need_download_set:
             url = index_url_map[ts_index]
             full_path = path_join(ts_path, f"{ts_index}.ts")
+            logger.info(f"需要重新下载的index:{ts_index},url:{url}")
             download_from_url(url, full_path, file_name, aes_key=aes_key_str, aes_iv=aes_iv_str)
 
 
@@ -163,6 +168,7 @@ def read_file(prefix_url, file_path):
 
                 iv_str_arr = re.findall('IV=(.*)', new_item)
                 aes_iv_str = iv_str_arr[0] if iv_str_arr else aes_iv_str
+                aes_iv_str = aes_iv_str.replace("0x", "")[:16]
             if new_item.endswith(".ts"):
                 if "/" in new_item:
                     new_item = new_item.split("/")[-1]
@@ -170,7 +176,7 @@ def read_file(prefix_url, file_path):
                 url = f"{prefix_url}/{new_item}"
                 index_url_map[index] = url
                 max_ts_index = index
-                yield url, f"{index}.ts", aes_key_str, aes_iv_str.replace("0x", "")[:16]
+                yield url, f"{index}.ts", aes_key_str, aes_iv_str
 
 
 def get_m3u8(download_url, file_path):
