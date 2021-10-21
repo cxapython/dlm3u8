@@ -38,13 +38,6 @@ aes_key_str = ""
 aes_iv_str = "0" * 16
 max_ts_index = 0
 
-
-# proxies = {
-#     "http": "http://127.0.0.1:7890",
-#     "https": "https://127.0.0.1:7890"
-# }
-
-
 @retry(stop_max_attempt_number=10, stop_max_delay=1000)
 def download_and_check(url, dst, file_name, my_code=None):
     response = requests.get(url, headers=headers, stream=True, timeout=10)  # (1)
