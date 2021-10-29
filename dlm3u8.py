@@ -98,8 +98,6 @@ def download_from_url(url, dst, file_name, aes_key="", aes_iv="", my_code=None):
 def before_merge_mp4_check(file_name):
     need_download_set = set()
     while not need_download_set:
-        import pdb
-        pdb.set_trace()
         path_join = os.path.join
         file_list = sorted(int(item.replace(".ts", ""))
                            for item in os.listdir(ts_path) if ".ts" in item)
@@ -116,7 +114,8 @@ def before_merge_mp4_check(file_name):
             full_path = path_join(ts_path, f"{ts_index}.ts")
             logger.info(f"需要重新下载的index:{ts_index},url:{url}")
             download_from_url(url, full_path, file_name, aes_key=aes_key_str, aes_iv=aes_iv_str)
-
+        if not need_download_set:
+            break
 
 def get_ts_file(ts_item):
     url = ts_item[0]
